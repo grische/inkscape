@@ -1757,7 +1757,7 @@ GridWidget::GridWidget(SPGrid *grid)
         }
     });
     angle_popover->set_child(*subgrid);
-    angle_popover->signal_show().connect([this](){
+    angle_popover->signal_show().connect([=](){
         if (!_grid) return;
 
         auto ax = _grid->getAngleX();
@@ -1986,6 +1986,11 @@ GridWidget::GridWidget(SPGrid *grid)
         cur_grid->attach(*rs, 0, row++, width);
     }
 
+    // Don't allow negative values for spacing or block width/height.
+    for (auto rs : std::to_array<Scalar*>({_spacing_x, _spacing_y})) {
+        rs->setRange(0, 1000000);
+    }
+
     left_col->attach(*_angle_y_vertical, 0, row++, 2);
     left_col->attach(*_swap_axes, 0, row++, 2);
     right_col->attach(*_no_of_lines, 0, row++, 2);
@@ -2088,6 +2093,13 @@ void GridWidget::update()
         _gap_y->setValueKeepUnit(gap.y(), "px");
         _margin_x->setValueKeepUnit(margin.x(), "px");
         _margin_y->setValueKeepUnit(margin.y(), "px");
+
+        // Set limits based on other values
+        auto spacing = _grid->getSpacing();
+        _gap_x->setRange(-spacing.x()/2.0, 10000000);
+        _gap_y->setRange(-spacing.y()/2.0, 10000000);
+        _margin_x->setRange(-spacing.x()/2.0, _grid->get_gap().x()/2.0);
+        _margin_y->setRange(-spacing.y()/2.0, _grid->get_gap().y()/2.0);
     }
 
     _grid_color->setColor(_grid->getMajorColor());
