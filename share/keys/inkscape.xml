@@ -41,7 +41,6 @@ override) the bindings in the main default.xml.
   <modifier action="select-cycle" modifiers="Alt"/>
 
   <modifier action="move-confine" modifiers="Ctrl"/>
-  <modifier action="move-increment" modifiers="Alt"/>
   <modifier action="move-snapping" />
   
   <modifier action="trans-confine" modifiers="Ctrl"/>
