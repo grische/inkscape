@@ -63,6 +63,7 @@ public:
     GridWidget(SPGrid *obj);
 
     void update();
+    void updateModularGridLimits();
     SPGrid *getGrid() { return _grid; }
     XML::Node *getGridRepr() { return _repr; }
 
@@ -1757,7 +1758,7 @@ GridWidget::GridWidget(SPGrid *grid)
         }
     });
     angle_popover->set_child(*subgrid);
-    angle_popover->signal_show().connect([=](){
+    angle_popover->signal_show().connect([this](){
         if (!_grid) return;
 
         auto ax = _grid->getAngleX();
@@ -1987,8 +1988,8 @@ GridWidget::GridWidget(SPGrid *grid)
     }
 
     // Don't allow negative values for spacing or block width/height.
-    for (auto rs : std::to_array<Scalar*>({_spacing_x, _spacing_y})) {
-        rs->setRange(0, 1000000);
+    for (auto rs : std::to_array<Scalar *>({_spacing_x, _spacing_y})) {
+        rs->setRange(0, Scalar::COMMON_MAX);
     }
 
     left_col->attach(*_angle_y_vertical, 0, row++, 2);
@@ -2000,6 +2001,12 @@ GridWidget::GridWidget(SPGrid *grid)
             _modified_signal.block();
             update();
             _modified_signal.unblock();
+        } else if (_grid->getType() == GridType::MODULAR) {
+            // Even if we're updating already from a separate "changed" signal, we want to update
+            // grid limits. Each spinbutton will have its own handler that marks the widget
+            // registry as "updating" while it changes the grid. But here, we want to update the
+            // limits on the OTHER spinbuttons in the dialog even if that's happening.
+            updateModularGridLimits();
         }
     });
     update();
@@ -2094,12 +2101,7 @@ void GridWidget::update()
         _margin_x->setValueKeepUnit(margin.x(), "px");
         _margin_y->setValueKeepUnit(margin.y(), "px");
 
-        // Set limits based on other values
-        auto spacing = _grid->getSpacing();
-        _gap_x->setRange(-spacing.x()/2.0, 10000000);
-        _gap_y->setRange(-spacing.y()/2.0, 10000000);
-        _margin_x->setRange(-spacing.x()/2.0, _grid->get_gap().x()/2.0);
-        _margin_y->setRange(-spacing.y()/2.0, _grid->get_gap().y()/2.0);
+        updateModularGridLimits();
     }
 
     _grid_color->setColor(_grid->getMajorColor());
@@ -2127,6 +2129,15 @@ void GridWidget::update()
     _id->set_tooltip_text(id);
 
     _wr.setUpdating(false);
+}
+
+void GridWidget::updateModularGridLimits()
+{
+    auto unit = _units->getUnit()->abbr;
+    _gap_x->setRange(-_spacing_x->getValue(unit) / 2.0, Scalar::COMMON_MAX);
+    _gap_y->setRange(-_spacing_y->getValue(unit) / 2.0, Scalar::COMMON_MAX);
+    _margin_x->setRange(-_spacing_x->getValue(unit) / 2.0, _gap_x->getValue(unit) / 2.0);
+    _margin_y->setRange(-_spacing_y->getValue(unit) / 2.0, _gap_y->getValue(unit) / 2.0);
 }
 
 } // namespace Widget
