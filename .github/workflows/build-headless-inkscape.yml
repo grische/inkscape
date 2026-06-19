@@ -55,7 +55,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Test - headless export must not emit the GtkRecentManager warning
+      - name: Test - headless export must not emit "Failed to wrap object" warnings
         run: |
           set -euo pipefail
           printf '%s\n' \
@@ -67,8 +67,10 @@ jobs:
           echo "----- inkscape output -----"
           echo "$out"
           echo "---------------------------"
-          if echo "$out" | grep -qi "GtkRecentManager"; then
-            echo "FAIL: the GtkRecentManager warning is still present"
+          # Catches both GtkRecentManager (5419) and PangoFT2FontMap, and any
+          # other headless wrap warning of the same family.
+          if echo "$out" | grep -qi "Failed to wrap object of type"; then
+            echo "FAIL: a 'Failed to wrap object' warning is still present"
             exit 1
           fi
           if [ ! -f out.png ]; then

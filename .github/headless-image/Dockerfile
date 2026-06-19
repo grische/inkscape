@@ -2,14 +2,15 @@
 #
 # Patched Inkscape 1.4.2 (GTK3) for headless / command-line use.
 #
-# Builds Inkscape from the upstream release tag with a small downstream patch
-# that stops the spurious warning emitted on every headless export:
+# Builds Inkscape from the upstream release tag with two small downstream patches
+# that stop the spurious "Failed to wrap object of type ..." warnings printed on
+# every headless export (no display => gtkmm/pangomm wrappers never registered):
 #
 #   glibmm-WARNING **: Failed to wrap object of type 'GtkRecentManager'.
-#   Hint: this error is commonly caused by failing to call a library
-#   init() function.
+#   ... WARNING **: Failed to wrap object of type 'PangoFT2FontMap'.
 #
-# Root cause and fix: https://gitlab.com/inkscape/inkscape/-/work_items/5419
+# 0001 (GtkRecentManager): https://gitlab.com/inkscape/inkscape/-/work_items/5419
+# 0002 (PangoFT2FontMap): drops an unused Glib::wrap() of the FT2 font map.
 #
 # The build base is Inkscape's own CI dependency image for Ubuntu 22.04, which
 # already ships the full GTK3 build dependency set (libgtkmm-3.0-dev, cmake,
@@ -34,17 +35,18 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends libboost-stacktrace-dev; \
     rm -rf /var/lib/apt/lists/*
 
-COPY 0001-headless-recentmanager-5419.patch /tmp/inkscape.patch
+COPY 0001-headless-recentmanager-5419.patch 0002-headless-pangoft2fontmap.patch /tmp/
 
 # Clone the exact release (incl. submodules: 2geom and libcroco are required to
-# build), apply the patch, build, install, then drop the source tree so it does
+# build), apply the patches, build, install, then drop the source tree so it does
 # not bloat the image. Kept in one layer so the cleanup actually saves space.
 RUN set -eux; \
     git clone --depth 1 --branch "${INKSCAPE_TAG}" \
         --recurse-submodules --shallow-submodules \
         https://gitlab.com/inkscape/inkscape.git /src; \
     cd /src; \
-    git apply -v /tmp/inkscape.patch; \
+    git apply -v /tmp/0001-headless-recentmanager-5419.patch \
+                 /tmp/0002-headless-pangoft2fontmap.patch; \
     cmake -S . -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -53,7 +55,7 @@ RUN set -eux; \
     cmake --install build; \
     ldconfig; \
     cd /; \
-    rm -rf /src /tmp/inkscape.patch
+    rm -rf /src /tmp/0001-headless-recentmanager-5419.patch /tmp/0002-headless-pangoft2fontmap.patch
 
-# Smoke test: must run and must NOT print the GtkRecentManager warning.
+# Smoke test: must run and must not print a "Failed to wrap object" warning.
 RUN inkscape --version
