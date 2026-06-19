@@ -25,6 +25,15 @@ FROM ${INKSCAPE_CI_IMAGE}
 
 ARG INKSCAPE_TAG
 
+# The ubuntu-2204 dependency image omits Boost.Stacktrace, which Inkscape 1.4.2
+# requires (used for crash backtraces). The upstream /master CI image — the one
+# that historically built 1.4.2 — does install it, so add it here.
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libboost-stacktrace-dev; \
+    rm -rf /var/lib/apt/lists/*
+
 COPY 0001-headless-recentmanager-5419.patch /tmp/inkscape.patch
 
 # Clone the exact release (incl. submodules: 2geom and libcroco are required to
