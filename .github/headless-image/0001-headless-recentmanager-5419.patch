@@ -1,0 +1,46 @@
+diff --git a/src/inkscape-application.cpp b/src/inkscape-application.cpp
+index 6093030758..73bc0c871e 100644
+--- a/src/inkscape-application.cpp
++++ b/src/inkscape-application.cpp
+@@ -188,7 +188,13 @@ InkscapeApplication::document_open(const Glib::RefPtr<Gio::File>& file, bool *ca
+ 
+         // Add/promote recent file; when we call add_item and file is on a recent list already,
+         // then apparently only "modified" time changes.
+-        if (auto recentmanager = Gtk::RecentManager::get_default()) {
++        // Skip this entirely when running headless (no display): calling
++        // Gtk::RecentManager::get_default() before GTK is initialized emits a spurious
++        // "Failed to wrap object of type 'GtkRecentManager'" warning, because the gtkmm
++        // wrappers are only registered once GTK is set up. Recent files are a GUI-only
++        // concept. See https://gitlab.com/inkscape/inkscape/-/work_items/5419.
++        if (auto recentmanager = gdk_display_get_default() ? Gtk::RecentManager::get_default()
++                                                           : Glib::RefPtr<Gtk::RecentManager>{}) {
+             auto uri = file->get_uri();
+             auto path = file->get_path();
+             // Opening crash files, we can link them back using the recent files manager
+diff --git a/src/inkscape.cpp b/src/inkscape.cpp
+index 7f7defa557..6738745079 100644
+--- a/src/inkscape.cpp
++++ b/src/inkscape.cpp
+@@ -21,6 +21,7 @@
+ #include <map>
+ #include <boost/stacktrace.hpp>
+ #include <glibmm/regex.h>
++#include <gdk/gdk.h> // gdk_display_get_default
+ #include <glibmm/i18n.h>
+ #include <glibmm/miscutils.h>
+ #include <glibmm/convert.h>
+@@ -436,8 +437,12 @@ Application::crash_handler (int /*signum*/)
+                 savednames.push_back(g_strdup (c));
+                 fclose (file);
+ 
+-                // Attempt to add the emergency save to the recent files, so users can find it on restart
+-                auto recentmanager = Gtk::RecentManager::get_default();
++                // Attempt to add the emergency save to the recent files, so users can find it on restart.
++                // Skip when headless (no display): calling Gtk::RecentManager::get_default() before GTK
++                // is initialized emits a spurious "Failed to wrap object of type 'GtkRecentManager'"
++                // warning. See https://gitlab.com/inkscape/inkscape/-/work_items/5419.
++                auto recentmanager = gdk_display_get_default() ? Gtk::RecentManager::get_default()
++                                                               : Glib::RefPtr<Gtk::RecentManager>{};
+                 if (recentmanager && Glib::path_is_absolute(c)) {
+                     Glib::ustring uri = Glib::filename_to_uri(c);
+                     recentmanager->add_item(uri, {
